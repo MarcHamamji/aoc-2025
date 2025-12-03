@@ -1,5 +1,5 @@
 # Advent of Code 2025 - Solutions
-This repository contains my solutions for the Advent of Code 2025 programming challenges. Each day's challenge is solved in a separate directory.
+This repository contains my solutions for the [Advent of Code](https://adventofcode.com/) 2025 programming challenges. Each day's challenge is solved in a separate directory.
 
 ## Directory Structure
 - `day-XX/part-YY.*`: Solution for day XX, part YY
