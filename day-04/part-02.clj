@@ -62,8 +62,7 @@
        :num-removed num-accessible-rolls))))
 
 (defn count-removable-rolls [diagram]
-  (->> -1
-       (hash-map :diagram diagram :num-removed)
+  (->> (hash-map :diagram diagram :num-removed -1)
        (iterate remove-accessible-rolls)
        (take-while #(not (zero? (:num-removed %))))
        (map #(:num-removed %))
