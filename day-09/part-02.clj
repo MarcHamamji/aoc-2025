@@ -41,10 +41,56 @@
            \X (recur (inc index) (inc num-edges) (if (zero? num-edges) true first-x))
            \. (recur (inc index) num-edges first-x)))))))
 
-(defn set-fill [grid [row col]]
-  (if (is-inside-shape grid row col)
-    (set-grid-char grid row col \I)
-    grid))
+; (defn set-fill [grid [row col]]
+;   (if (is-inside-shape grid row col)
+;     (set-grid-char grid row col \I)
+;     grid))
+
+(defn fill-row [row]
+  (loop [i 0
+         filled-row []
+         is-inside false]
+    (if (= i (count row))
+      filled-row
+      (case (get row i)
+        \V (recur (inc i) (conj filled-row \V) (not is-inside))
+        \H (recur (inc i) (conj filled-row \H) is-inside)
+        \. (recur (inc i) (conj filled-row (if is-inside \I \.)) is-inside)
+        \X (recur (inc i) (conj filled-row \X) is-inside)))))
+
+(defn fill-grid [grid]
+  (for [row-index (range (count grid))]
+    (let [row (get grid row-index)]
+
+      (loop [col-index 0
+             filled-row []
+             is-inside false
+             last-x-is-down nil]
+        (if (= col-index (count row))
+          filled-row
+          (case (get row col-index)
+            \V (recur (inc col-index) (conj filled-row \V) (not is-inside) nil)
+            \H (recur (inc col-index) (conj filled-row \H) is-inside last-x-is-down)
+            \. (recur (inc col-index) (conj filled-row (if is-inside \I \.)) is-inside nil)
+            \X (if (nil? last-x-is-down)
+
+                 ; landed on an edge
+                 (recur
+                  (inc col-index)
+                  (conj filled-row \X)
+                  is-inside
+                  (= (get-grid-char grid (inc row-index) col-index) \V))
+
+                 ; finishing an edge
+                 (recur
+                  (inc col-index)
+                  (conj filled-row \X)
+                  (if (=
+                       (= (get-grid-char grid (inc row-index) col-index) \V); is the end pointing down
+                       last-x-is-down)
+                    is-inside
+                    (not is-inside))
+                  nil))))))))
 
 (defn is-valid-rect [grid [t1-col t1-row] [t2-col t2-row]]
   (let [min-col (min t1-col t2-col)
@@ -64,26 +110,52 @@
      (fn [row] (every? #(not= % \.) row))
      rect)))
 
-(defn get-max-area [tiles]
-  (let [width (+ 2 (apply max (map first tiles)))
-        height (+ 2 (apply max (map second tiles)))
-        empty-grid (vec (repeat height (vec (repeat width \.))))
-        grid-with-corners (reduce add-tile-to-grid empty-grid tiles)
-        grid-with-edges (reduce add-edge-to-grid grid-with-corners (conj (partition 2 1 tiles) [(first tiles) (last tiles)]))
-        grid-with-fill (reduce set-fill grid-with-edges (for [row (range height) col (range width)] [row col]))]
+(defn get-compactness-maps [tiles]
+  (let [sorted-rows (sort (set (map first tiles)))
+        indexed-rows (reduce #(assoc %1 (second %2) (* 2 (first %2))) (hash-map) (map-indexed vector sorted-rows))
+        sorted-cols (sort (set (map second tiles)))
+        indexed-cols (reduce #(assoc %1 (second %2) (* 2 (first %2))) (hash-map) (map-indexed vector sorted-cols))]
+    [indexed-rows indexed-cols]))
 
+(defn get-max-area [tiles]
+  (let [[compact-rows-map compact-cols-map] (get-compactness-maps tiles)
+        width (* 2 (count compact-cols-map))
+        height (* 2 (count compact-rows-map))
+        compact-tiles (map #(vec [(compact-rows-map (first %)) (compact-cols-map (second %))]) tiles)
+        empty-grid (vec (repeat height (vec (repeat width \.))))
+        grid-with-corners (reduce add-tile-to-grid empty-grid compact-tiles)
+        grid-with-edges (reduce add-edge-to-grid grid-with-corners (conj (partition 2 1 compact-tiles) [(first compact-tiles) (last compact-tiles)]))
+        grid-with-fill (fill-grid grid-with-edges)]
+
+    (println "compact-rows-map")
+    (println compact-rows-map)
+    (println "compact-cols-map")
+    (println compact-cols-map)
+    (println "width")
+    (println width)
+    (println "height")
+    (println height)
+    (println "compact-tiles")
+    (println compact-tiles)
+    (println "empty-grid")
+    (println (str/join "\n" empty-grid))
     (println "grid with corners")
     (println (str/join "\n" grid-with-corners))
     (println "grid with edges")
     (println (str/join "\n" grid-with-edges))
     (println "grid with fill")
-    (println (str/join "\n" grid-with-fill))
+    (println (str/join "\n" (map #(str/join "" %) grid-with-fill)))
 
     (apply max (for [t1 tiles
                      t2 tiles
                      :when (not= t1 t2)
-                     :when (is-valid-rect grid-with-fill t1 t2)]
-                 (get-area t1 t2)))))
+                     :when (is-valid-rect
+                            (vec grid-with-fill)
+                            [(compact-rows-map (first t1)) (compact-cols-map (second t1))]
+                            [(compact-rows-map (first t2)) (compact-cols-map (second t2))])]
+                 (do
+                   (println "for" t1 t2)
+                   (get-area t1 t2))))))
 
 (println
  "Final Answer:"
@@ -91,7 +163,6 @@
    (nth input 1)
    (slurp input)
    (str/split input #"\n")
-   ; 1580
    (map (fn [line]
           (map #(int (parse-long %)) (str/split line #","))) input)
    (get-max-area input)))
